@@ -10,7 +10,8 @@ import metpy.calc as mpcalc
 from metpy.plots import Hodograph, SkewT
 from metpy.units import units
 
-def convert_one(f_in, f_out, save_csv=True, debug=False):
+def convert_one(f_in, f_out=False, 
+                save_csv=True, debug=False):
     skiprows = 3  # make sure this is correct
 
     with open(f_in) as f:
@@ -38,9 +39,16 @@ def convert_one(f_in, f_out, save_csv=True, debug=False):
     p = data[:, 0]
     z = data[:, 1]
     T = data[:, 2]
-    r = data[:, 5]/1000.
     ff = data[:, 6]
     dd = data[:, 7]
+
+    if True:
+        rh = data[:, 4]/100
+        svp = mpcalc.saturation_vapor_pressure(T*units.K)
+        vp = rh * svp
+        r = mpcalc.mixing_ratio(vp, p*units.millibar)
+    else:
+        r = data[:, 5]/1000.
 
     #### convert to WRF variables
 
@@ -61,7 +69,6 @@ def convert_one(f_in, f_out, save_csv=True, debug=False):
                    np.linspace(273, 360, len(p)-30 )])
 
     ####################################
-
     # Temperature to potential temperature
     pot_tmp = T*(1000/p)**kappa_moist
 
@@ -87,14 +94,24 @@ def convert_one(f_in, f_out, save_csv=True, debug=False):
         fig.savefig('test.png')
     # vp = mpcalc.vapor_pressure(p*units.millibar, r)
     # Td = mpcalc.dewpoint_from_relative_humidity(T*units.K, vp/svp)
-    # ax.plot(Td, p, 'g-')
-    # ax.invert_yaxis()
-    # fig.savefig('test.png')
-    #
-    # fig, ax = plt.subplots()
-    # ax.plot(dd, p)
-    # ax.invert_yaxis()
-    # fig.savefig('test2.png')
+
+    ###############
+    # plot
+    import plot_profile as prof
+    T = T * units.K
+    p = p * units.millibar
+
+    vp = mpcalc.vapor_pressure(p, r)
+    svp = mpcalc.saturation_vapor_pressure(T)
+    Td = mpcalc.dewpoint_from_relative_humidity(T, vp/svp)
+    Td[np.isnan(Td)] = -99.*units.degree_Celsius  # fill nan with very low temp
+    Td_i = 
+
+    f_in_basename = os.path.basename(f_in)
+    prof.core(p, T, Td, u, v, 
+            saveto='./prof_'+f_in_basename+'.png', title=f_in_basename)
+
+
     ####################################
     # surface measurements
     sp = p[0]  # surface pressure
@@ -104,7 +121,7 @@ def convert_one(f_in, f_out, save_csv=True, debug=False):
 
     line1 = '{:9.2f} {:9.2f} {:10.2f}'.format(sp, t_2m, r_2m)
 
-    if save_csv:
+    if save_csv and f_out:
         df = pd.DataFrame(data={'p': p, 'T': T, 'Qv': r})
         csvname = '.'.join(f_out.split('.')[:-1])+'.csv'
         df.to_csv(csvname)
@@ -114,18 +131,27 @@ def convert_one(f_in, f_out, save_csv=True, debug=False):
     wrfformat = '{:9.2f} {:9.2f} {:10.2f} {:10.2f} {:10.2f}'
     r *= 1000.
 
-    with open(f_out, 'w') as f:
-        f.write(line1+' \n')
-        for i in range(n_levels):
-            d = wrfformat.format(z[i], pot_tmp[i], r[i], u[i], v[i])
-            if debug: print(d)
-            f.write(d+ '\n')
-    print(f_out, 'saved.')
+    if f_out:
+        with open(f_out, 'w') as f:
+            f.write(line1+' \n')
+            for i in range(n_levels):
+                d = wrfformat.format(z[i], pot_tmp[i], r[i], u[i], v[i])
+                if debug: print(d)
+                f.write(d+ '\n')
+        print(f_out, 'saved.')
 
 if __name__ == '__main__':
 
-    infiles = glob.glob('/home/fs71386/lkugler/wrf_sounding/data/LMU/raso.*')
-    dir_out = '/home/fs71386/lkugler/wrf_sounding/data/wrf/ens/LMU+shear/'
+
+    # just plot
+    if False:
+        f_in = '/jetfs/home/lkugler/wrf_sounding/data/LMU/improved/raso.v2'
+        convert_one(f_in, f_out=False)
+
+
+
+    infiles = glob.glob('/home/fs71386/lkugler/wrf_sounding/data/LMU/improved/raso.*')
+    dir_out = '/home/fs71386/lkugler/wrf_sounding/data/wrf/ens/2021-05-04/'
     os.makedirs(dir_out, exist_ok=True)
 
     for f_in in infiles:
