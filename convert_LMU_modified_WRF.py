@@ -1,5 +1,7 @@
 #!/home/fs71386/lkugler/miniconda3/envs/DART/bin/python
-"""Create modified profiles"""
+"""Create modified profiles
+output txt files in `LMU` format
+"""
 
 import pandas as pd
 import numpy as np
@@ -9,6 +11,8 @@ import matplotlib.pyplot as plt
 import metpy.calc as mpcalc
 from metpy.plots import Hodograph, SkewT
 from metpy.units import units
+
+import plot_profile as prof
 
 def convert_one(f_in, f_out=False, dir_out='./', save_csv=True, debug=False):
     skiprows = 3  # make sure this is correct
@@ -95,26 +99,26 @@ def convert_one(f_in, f_out=False, dir_out='./', save_csv=True, debug=False):
     # Td = mpcalc.dewpoint_from_relative_humidity(T*units.K, vp/svp)
 
     ###############
-    # plot
-    import plot_profile as prof
-    T = T * units.K
-    p = p * units.millibar
+    def plot(T, p, r, f_in, dir_out):
+        T = T * units.K
+        p = p * units.millibar
 
-    vp = mpcalc.vapor_pressure(p, r)
-    svp = mpcalc.saturation_vapor_pressure(T)
-    Td = mpcalc.dewpoint_from_relative_humidity(T, vp/svp)
-    Td[np.isnan(Td)] = -99.*units.degree_Celsius  # fill nan with very low temp
+        vp = mpcalc.vapor_pressure(p, r)
+        svp = mpcalc.saturation_vapor_pressure(T)
+        Td = mpcalc.dewpoint_from_relative_humidity(T, vp/svp)
+        Td[np.isnan(Td)] = -99.*units.degree_Celsius  # fill nan with very low temp
 
-    f_in_basename = os.path.basename(f_in)
-    prof.core(p, T, Td, u, v, 
-            saveto=dir_out+'prof_'+f_in_basename+'.png', title=f_in_basename)
+        f_in_basename = os.path.basename(f_in)
+        prof.core(p, T, Td, u, v, 
+                saveto=dir_out+'prof_'+f_in_basename+'.png', title=f_in_basename)
 
+    plot(T, p, r, f_in, dir_out)
 
     ####################################
     # surface measurements
     sp = p[0]  # surface pressure
     t_2m = pot_tmp[0]  # surface potential Temperature
-    r_2m = r[0]*1000.  # surface vapor mixing ratio
+    r_2m = r[0].magnitude*1000.  # surface vapor mixing ratio
     n_levels = z.shape[0]
 
     line1 = '{:9.2f} {:9.2f} {:10.2f}'.format(sp, t_2m, r_2m)
@@ -131,6 +135,8 @@ def convert_one(f_in, f_out=False, dir_out='./', save_csv=True, debug=False):
     r *= 1000.
 
     if f_out:
+        r = r.magnitude
+
         f_out = dir_out+f_out
         with open(f_out, 'w') as f:
             f.write(line1+' \n')
@@ -148,7 +154,7 @@ if __name__ == '__main__':
         f_in = '/jetfs/home/lkugler/wrf_sounding/data/LMU/improved/raso.v2'
         convert_one(f_in, f_out=False)
 
-    maindir = '/jetfs/home/lkugler/wrf_sounding/'
+    maindir = '/jetfs/home/lkugler/wrf_profiles/'
 
     infiles = glob.glob(maindir+'/data/LMU/improved/raso.nat.*')
     dir_out = maindir+'/data/wrf/ens/2021-05-04/'
