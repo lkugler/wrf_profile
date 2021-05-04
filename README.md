@@ -1,7 +1,11 @@
 # wrf_profile
 Create input_sounding files for idealized WRF runs
 
-### from University of Wyoming's database
+1) Specify reference profile (e.g. by hand, https://github.com/lkugler/wrf_profile/blob/master/data/LMU/improved/raso.v2)
+2) Create perturbed initial condition profiles from reference profile with `create_perturbed_members.py` 
+3) Transform to WRF input_profile format with `convert_LMU_modified_WRF.py` 
+
+### alternative data source (Uni Wyoming)
 
 ```
 f_in = 'wyoming_sounding.txt'  # excerpt of the html
