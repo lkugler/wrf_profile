@@ -10,8 +10,7 @@ import metpy.calc as mpcalc
 from metpy.plots import Hodograph, SkewT
 from metpy.units import units
 
-def convert_one(f_in, f_out=False, 
-                save_csv=True, debug=False):
+def convert_one(f_in, f_out=False, dir_out='./', save_csv=True, debug=False):
     skiprows = 3  # make sure this is correct
 
     with open(f_in) as f:
@@ -105,11 +104,10 @@ def convert_one(f_in, f_out=False,
     svp = mpcalc.saturation_vapor_pressure(T)
     Td = mpcalc.dewpoint_from_relative_humidity(T, vp/svp)
     Td[np.isnan(Td)] = -99.*units.degree_Celsius  # fill nan with very low temp
-    Td_i = 
 
     f_in_basename = os.path.basename(f_in)
     prof.core(p, T, Td, u, v, 
-            saveto='./prof_'+f_in_basename+'.png', title=f_in_basename)
+            saveto=dir_out+'prof_'+f_in_basename+'.png', title=f_in_basename)
 
 
     ####################################
@@ -122,16 +120,18 @@ def convert_one(f_in, f_out=False,
     line1 = '{:9.2f} {:9.2f} {:10.2f}'.format(sp, t_2m, r_2m)
 
     if save_csv and f_out:
+        os.makedirs(dir_out+'/csv/', exist_ok=True)
+        csvname = dir_out+'/'+'.'.join(f_out.split('.')[:-1])+'.csv'
+
         df = pd.DataFrame(data={'p': p, 'T': T, 'Qv': r})
-        csvname = '.'.join(f_out.split('.')[:-1])+'.csv'
         df.to_csv(csvname)
         print(csvname, 'saved.')
-    # print(df.columns)
-    # d = df[['Z [m],']].to_dict()
+
     wrfformat = '{:9.2f} {:9.2f} {:10.2f} {:10.2f} {:10.2f}'
     r *= 1000.
 
     if f_out:
+        f_out = dir_out+f_out
         with open(f_out, 'w') as f:
             f.write(line1+' \n')
             for i in range(n_levels):
@@ -148,13 +148,13 @@ if __name__ == '__main__':
         f_in = '/jetfs/home/lkugler/wrf_sounding/data/LMU/improved/raso.v2'
         convert_one(f_in, f_out=False)
 
+    maindir = '/jetfs/home/lkugler/wrf_sounding/'
 
-
-    infiles = glob.glob('/home/fs71386/lkugler/wrf_sounding/data/LMU/improved/raso.*')
-    dir_out = '/home/fs71386/lkugler/wrf_sounding/data/wrf/ens/2021-05-04/'
+    infiles = glob.glob(maindir+'/data/LMU/improved/raso.nat.*')
+    dir_out = maindir+'/data/wrf/ens/2021-05-04/'
     os.makedirs(dir_out, exist_ok=True)
 
     for f_in in infiles:
-        f_out = dir_out+os.path.basename(f_in)+'.wrfprof'
-        convert_one(f_in, f_out)
+        fname_out = os.path.basename(f_in)+'.wrfprof'
+        convert_one(f_in, fname_out, dir_out=dir_out)
         #sys.exit()
