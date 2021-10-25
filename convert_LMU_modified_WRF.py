@@ -1,8 +1,4 @@
 #!/home/fs71386/lkugler/miniconda3/envs/DART/bin/python
-"""Create modified profiles
-output txt files in `LMU` format
-"""
-
 import pandas as pd
 import numpy as np
 import os, csv, glob, sys
@@ -15,6 +11,11 @@ from metpy.units import units
 import plot_profile as prof
 
 def convert_one(f_in, f_out=False, dir_out='./', save_csv=True, debug=False):
+    """Convert LMU formatted profile to WRF formatted profile.
+    Options: 
+      save in csv format and plotting
+    """
+    # Read in LMU formatted profile
     skiprows = 3  # make sure this is correct
 
     with open(f_in) as f:
@@ -38,6 +39,7 @@ def convert_one(f_in, f_out=False, dir_out='./', save_csv=True, debug=False):
 			    j += 1
 
     if debug: print('input header:', header)
+    ############################################
 
     p = data[:, 0]
     z = data[:, 1]
@@ -46,11 +48,13 @@ def convert_one(f_in, f_out=False, dir_out='./', save_csv=True, debug=False):
     dd = data[:, 7]
 
     if True:
+        # use RH column as input moisture profile
         rh = data[:, 4]/100
         svp = mpcalc.saturation_vapor_pressure(T*units.K)
         vp = rh * svp
         r = mpcalc.mixing_ratio(vp, p*units.millibar)
     else:
+        # use the mixing ratio column as input moisture profile
         r = data[:, 5]/1000.
 
     #### convert to WRF variables
@@ -79,7 +83,7 @@ def convert_one(f_in, f_out=False, dir_out='./', save_csv=True, debug=False):
     v = -ff * np.sin(dd/180*np.pi+np.pi/2)
 
     ####################################
-    # modifications
+    # specify moisture profile (testing)
     #vp = mpcalc.vapor_pressure(p*units.millibar, r)
     if False:
         svp = mpcalc.saturation_vapor_pressure(T*units.K)
@@ -147,17 +151,15 @@ def convert_one(f_in, f_out=False, dir_out='./', save_csv=True, debug=False):
         print(f_out, 'saved.')
 
 if __name__ == '__main__':
-
-
     # just plot
     if False:
         f_in = '/jetfs/home/lkugler/wrf_sounding/data/LMU/improved/raso.v2'
         convert_one(f_in, f_out=False)
 
-    maindir = '/jetfs/home/lkugler/wrf_profiles/'
+    maindir = '/home/fs71386/lkugler/wrf_profiles/' #'/jetfs/home/lkugler/wrf_profiles/'
 
-    infiles = glob.glob(maindir+'/data/LMU/improved/raso.nat.*')
-    dir_out = maindir+'/data/wrf/ens/2021-05-04/'
+    infiles = glob.glob(maindir+'/data/LMU/improved_pert10/raso.fc.*')
+    dir_out = maindir+'/data/wrf/ens/improved_pert10/'
     os.makedirs(dir_out, exist_ok=True)
 
     for f_in in infiles:
