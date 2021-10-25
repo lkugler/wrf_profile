@@ -158,8 +158,8 @@ if __name__ == '__main__':
 
     maindir = '/home/fs71386/lkugler/wrf_profiles/' #'/jetfs/home/lkugler/wrf_profiles/'
 
-    infiles = glob.glob(maindir+'/data/LMU/improved_pert10/raso.fc.*')
-    dir_out = maindir+'/data/wrf/ens/improved_pert10/'
+    infiles = glob.glob(maindir+'/data/LMU/improved/raso.fc.*')
+    dir_out = maindir+'/data/wrf/ens/2021-05-04/'
     os.makedirs(dir_out, exist_ok=True)
 
     for f_in in infiles:
