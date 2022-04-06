@@ -1,7 +1,7 @@
 # wrf_profile
 Create input_sounding files for idealized WRF runs
 
-1) Specify reference profile (e.g. by hand, https://github.com/lkugler/wrf_profile/blob/master/data/LMU/improved/raso.v2)
+1) Specify reference profile (e.g. by hand, https://github.com/lkugler/wrf_profile/blob/master/raso.v2)
 2) Run `create_wrf_profiles.py` (modify as you like)
 
 #### Legacy code: alternative data source (Uni Wyoming) 
