@@ -28,7 +28,7 @@ cpv = 1847.  # specific heat vapor
 
 
 def load_reference_profile():
-    f_orig_profile_LMU = '/home/fs71386/lkugler/wrf_profiles/data/LMU/improved/raso.v2'
+    f_orig_profile_LMU = '/gpfs/data/fs71386/lkugler/initial_profiles/LMU/improved/raso.v2'
     a=np.loadtxt(f_orig_profile_LMU, skiprows=4)
 
     #retrieve profiles
@@ -189,15 +189,16 @@ def hodograph(z, u, v, f_out='./test.png'):
     plt.close(fig)
 
 if __name__ == '__main__':
-    np.random.seed(2)  # 1 for nature, 2 for forecast ensembles
-    n_ens = 80
+    np.random.seed(1)  # 1 for nature, 2 for forecast ensembles
+    n_ens = 4
 
-    maindir = '/home/fs71386/lkugler/wrf_profiles/'
-    dir_out = maindir + '/data/wrf/ens/2022-03-31/'
+    maindir = '/gpfs/data/fs71386/lkugler/initial_profiles/'
+    dir_out = maindir + '/wrf/ens/2022-03-31/'
     os.makedirs(dir_out, exist_ok=True)
 
     save_csv = True
     plot = True
+    prefix = 'raso.nat'
 
     for iens in range(1, n_ens+1):
         print('iens', iens)
@@ -210,13 +211,13 @@ if __name__ == '__main__':
         
         r = calc_mixing_ratio(p, t, rh)  # use RH column as input moisture profile
 
-        f_out = 'raso.fc.'+str(iens).zfill(3)+'.wrfprof'
+        f_out = prefix+'.'+str(iens).zfill(3)+'.wrfprof'
         save_in_WRF_format(z, p, t, r, u, v, 
             f_out = f_out, dir_out = dir_out)
 
         if save_csv:
             csvname = dir_out+'/'+'.'.join(f_out.split('.')[:-1])+'.csv'
-            df = pd.DataFrame(data={'p': p, 'T': t, 'r': r*1000, 'U': u, 'V': v})
+            df = pd.DataFrame(data={'z': z, 'p': p, 'T': t, 'r': r*1000, 'U': u, 'V': v})
             df.to_csv(csvname)
             print(csvname, 'saved.')
 
