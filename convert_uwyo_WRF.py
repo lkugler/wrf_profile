@@ -81,6 +81,7 @@ plot_ensembles = False
 p, z, T, Td, r, dd, ff, pot_tmp = read_uwyo(f_in)
 
 #### convert to WRF variables
+ff = ff * 1852/3600  # conversion from knots to meters/hour to meters/second
 u = -ff * np.cos(dd/180*np.pi-np.pi/2)
 v = -ff * np.sin(dd/180*np.pi+np.pi/2)
 
