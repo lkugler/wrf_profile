@@ -8,13 +8,15 @@ np.random.seed(1)
 def generate_ensemble(z, t, rh, u, v,
                       f_out='./test.txt'):
 
+    print('Temperature:')
     t += perturb(0., .25, n_rand, z) * units.K
+    print('----------')
     rh += rh*perturb(0, .05, n_rand, z)
 
     u += perturb(0., .25, n_rand, z)
     v += perturb(0., .25, n_rand, z)
 
-    rh[rh>1] = 1
+    rh[rh>.90] = .9
     rh[rh<0] = 0
 
     # convert to mixing ratio
@@ -25,7 +27,7 @@ def generate_ensemble(z, t, rh, u, v,
 ##################################################
 
 # open the nature run file
-f_wrfout = '/jetfs/home/lkugler/data/sim_archive/nat_250m_1600x1600x100/2008-07-30_08:00_/1/wrfout_d01_2008-07-30_10_00_00'
+f_wrfout = '/jetfs/home/lkugler/data/sim_archive/nat_250m_1600x1600x100/2008-07-30_08:00_/1/wrfout_d01_2008-07-30_08_05_00'
 
 with xr.open_dataset(f_wrfout) as ds_in:
     # get surface pressure
