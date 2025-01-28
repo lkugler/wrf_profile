@@ -9,7 +9,7 @@ from matplotlib.collections import LineCollection
 import metpy.calc as mpcalc
 from metpy.plots import Hodograph, SkewT
 from metpy.units import units
-
+import pint_xarray
 
 """
 Authors
@@ -27,9 +27,8 @@ cpd = 1005.7  # specific heat dry air
 cpv = 1847.  # specific heat vapor
 
 
-def load_reference_profile():
-    f_orig_profile_LMU = '/gpfs/data/fs71386/lkugler/initial_profiles/LMU/improved/raso.v2'
-    a=np.loadtxt(f_orig_profile_LMU, skiprows=4)
+def load_reference_profile(f_in = '/jetfs/home/lkugler/wrf_profiles/raso.v2'):
+    a=np.loadtxt(f_in, skiprows=4)
 
     #retrieve profiles
     z=a[:,1]  # height / m
@@ -52,6 +51,18 @@ def convert_cartesian_to_natural(u, v):
     ws = np.sqrt(u**2 + v**2)
     return ws, mpcalc.wind_direction(u*units.mps,v*units.mps).to('degrees').m
 
+def perturb(mu, sigma, number_of_random_numbers, z):
+    """get correlated perturbations on original grid"""
+    z_coarse = np.linspace(z.min(), z.max(), number_of_random_numbers)
+
+    # perturbations on coarse grid (uncorrelated)
+    rand_coarse = np.random.normal(mu,sigma, number_of_random_numbers)
+
+    # interpolate in space to get autocorrelated perturbations
+    f = interp1d(z_coarse, rand_coarse, kind='cubic')
+    interpolated_randn  = f(z)
+    return interpolated_randn
+
 def perturb_profile(z, t, rh, ws, wd):
     """Get perturbed vectors of temperature, relative humidity, ...
     
@@ -60,29 +71,17 @@ def perturb_profile(z, t, rh, ws, wd):
     Returns:
         np.array
     """
-
-    def perturb(mu=0, sigma=1):
-        """get correlated perturbations on original grid"""
-        z_coarse = np.linspace(np.amin(z),np.amax(z),nz_step)
-
-        # perturbations on coarse grid (uncorrelated)
-        rand_coarse = np.random.normal(mu,sigma,nz_step)
-
-        # interpolate in space to get autocorrelated perturbations
-        f   = interp1d(z_coarse,rand_coarse, kind='cubic')
-        interpolated_randn  = f(z)
-        return interpolated_randn
-
     step=20
     nz = len(z)
     nz_step = int(nz/step)
+    print('number of random numbers:', nz_step)
     
-    t += perturb(mu=0., sigma=.25)
-    rh += rh*perturb(mu=0, sigma=.02)
+    t += perturb(0., .25, nz_step, z)
+    rh += rh*perturb(0, .02, nz_step, z)
 
     u, v = convert_natural_to_cartesian(ws, wd)
-    u += perturb(mu=0., sigma=.25)
-    v += perturb(mu=0., sigma=.25)
+    u += perturb(0., .25, nz_step, z)
+    v += perturb(0., .25, nz_step, z)
     # ws, wd = convert_cartesian_to_natural(u, v)
 
     return t, rh, u, v
@@ -104,39 +103,37 @@ def calc_mixing_ratio(p, t, rh):
     r = mpcalc.mixing_ratio(vp, p*units.millibar)
     return r
 
-def save_in_WRF_format(z, p, t, r, u, v,
-        f_out=False, dir_out='./', 
-        save_csv=True, debug=False, plot=True):
-    """convert to WRF variables and save in WRF format"""
 
-    def write_WRF_format(z, p, pot_tmp, r, u, v):
-        # surface measurements
-        sp = p[0]  # surface pressure
-        t_2m = pot_tmp[0]  # surface potential Temperature
-        r_2m = r[0].magnitude*1000.  # surface vapor mixing ratio
-        n_levels = z.shape[0]
+def write_WRF_format(z, p_surface, pot_tmp, r, u, v, f_out='./test.txt'):
+    # from IPython import embed; embed()
+    
+    if hasattr(r, 'magnitude'):
+        r = r.magnitude  
+    if hasattr(z, 'magnitude'):
+        z = z.magnitude
+    if hasattr(p_surface, 'magnitude'):
+        p_surface = p_surface.magnitude
+    if hasattr(pot_tmp, 'magnitude'):
+        pot_tmp = pot_tmp.magnitude
+        
+    r = r * 1000  # in g/kg
+    
+    # surface measurements
+    sp = float(p_surface.values)  # surface pressure
+    t_2m = float(pot_tmp[0])  # surface potential Temperature
+    r_2m = float(r[0])  # surface vapor mixing ratio
+    n_levels = z.shape[0]
 
-        line1 = '{:9.2f} {:9.2f} {:10.2f}'.format(sp, t_2m, r_2m)
-        wrfformat = '{:9.2f} {:9.2f} {:10.2f} {:10.2f} {:10.2f}'
-
-        if f_out:
-            r = r.magnitude
-            
-            with open(dir_out+f_out, 'w') as f:
-                f.write(line1+' \n')
-                for i in range(n_levels):
-                    d = wrfformat.format(z[i], pot_tmp[i], r[i]*1000, u[i], v[i])
-                    if debug: print(d)
-                    f.write(d+ '\n')
-            print(dir_out+f_out, 'saved.')
-
-    # use the mixing ratio column as input moisture profile
-    # r = data[:, 5]/1000.
-
-    kappa_moist = Rd/cpd*(1+r*Rv/Rd)/(1+r*cpv/cpd)
-    pot_tmp = t*(1000/p)**kappa_moist  # potential temperature
-
-    write_WRF_format(z, p, pot_tmp, r, u, v)
+    line1 = '{:9.2f} {:9.2f} {:10.2f}'.format(sp, t_2m, r_2m)
+    wrfformat = '{:9.2f} {:9.2f} {:10.2f} {:10.2f} {:10.2f}'
+    
+    os.makedirs(os.path.dirname(f_out), exist_ok=True)
+    with open(f_out, 'w') as f:
+        f.write(line1+' \n')
+        for i in range(n_levels):
+            d = wrfformat.format(float(z[i]), float(pot_tmp[i]), float(r[i]), float(u[i]), float(v[i]))
+            f.write(d+ '\n')
+    print(f_out, 'saved.')
 
 
 
@@ -150,6 +147,7 @@ def profile(p, T, r, u, v,  f_out='./test.png'):
     Td[np.isnan(Td)] = -99.*units.degree_Celsius  # fill nan with very low temp
     import osselyze.plot_profile as pprof
     pprof.core(p, T, Td, u, v, figsize=(5,5.5), dpi=100, saveto=f_out)
+
 
 def hodograph(z, u, v, f_out='./test.png'):
 
@@ -165,7 +163,7 @@ def hodograph(z, u, v, f_out='./test.png'):
         line = ax.add_collection(lc)
         return line
 
-    import proplot as plot
+    import ultraplot as plot
     fig, ax = plot.subplots(figsize=(3,3), journal='ams1')
     ax.set_aspect(1)
     for radius in [5, 10, 15, 20, 25, 30]:
@@ -188,16 +186,17 @@ def hodograph(z, u, v, f_out='./test.png'):
     print(f_out, 'saved')
     plt.close(fig)
 
+
 if __name__ == '__main__':
     np.random.seed(1)  # 1 for nature, 2 for forecast ensembles
     n_ens = 4
 
-    maindir = '/gpfs/data/fs71386/lkugler/initial_profiles/'
+    maindir = '/jetfs/home/lkugler/wrf_profiles/TEST/'
     dir_out = maindir + '/wrf/ens/2022-03-31/'
     os.makedirs(dir_out, exist_ok=True)
 
-    save_csv = True
-    plot = True
+    save_csv = False
+    plot = False
     prefix = 'raso.nat'
 
     for iens in range(1, n_ens+1):
@@ -212,8 +211,13 @@ if __name__ == '__main__':
         r = calc_mixing_ratio(p, t, rh)  # use RH column as input moisture profile
 
         f_out = prefix+'.'+str(iens).zfill(3)+'.wrfprof'
-        save_in_WRF_format(z, p, t, r, u, v, 
-            f_out = f_out, dir_out = dir_out)
+
+        # use the mixing ratio column as input moisture profile
+        # r = data[:, 5]/1000.
+        kappa_moist = Rd/cpd*(1+r*Rv/Rd)/(1+r*cpv/cpd)
+        pot_tmp = t*(1000/p)**kappa_moist  # potential temperature
+
+        write_WRF_format(z, p[0], pot_tmp, r, u, v, f_out=dir_out+'/'+f_out)
 
         if save_csv:
             csvname = dir_out+'/'+'.'.join(f_out.split('.')[:-1])+'.csv'
