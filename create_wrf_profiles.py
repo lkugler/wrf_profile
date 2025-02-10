@@ -1,15 +1,14 @@
 import os
 import numpy as np
 import pandas as pd
-from scipy.interpolate import interp1d
 
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 
 import metpy.calc as mpcalc
-from metpy.plots import Hodograph, SkewT
+#from metpy.plots import Hodograph, SkewT
 from metpy.units import units
-import pint_xarray
+from create_ens_profile_from_wrfinput import perturb
 
 """
 Authors
@@ -51,17 +50,6 @@ def convert_cartesian_to_natural(u, v):
     ws = np.sqrt(u**2 + v**2)
     return ws, mpcalc.wind_direction(u*units.mps,v*units.mps).to('degrees').m
 
-def perturb(mu, sigma, number_of_random_numbers, z):
-    """get correlated perturbations on original grid"""
-    z_coarse = np.linspace(z.min(), z.max(), number_of_random_numbers)
-
-    # perturbations on coarse grid (uncorrelated)
-    rand_coarse = np.random.normal(mu,sigma, number_of_random_numbers)
-
-    # interpolate in space to get autocorrelated perturbations
-    f = interp1d(z_coarse, rand_coarse, kind='cubic')
-    interpolated_randn  = f(z)
-    return interpolated_randn
 
 def perturb_profile(z, t, rh, ws, wd):
     """Get perturbed vectors of temperature, relative humidity, ...
@@ -108,21 +96,25 @@ def write_WRF_format(z, p_surface, pot_tmp, r, u, v, f_out='./test.txt'):
     # from IPython import embed; embed()
     
     if hasattr(r, 'magnitude'):
-        r = r.magnitude  
+        r = r.to('g/kg').magnitude  
     if hasattr(z, 'magnitude'):
         z = z.magnitude
     if hasattr(p_surface, 'magnitude'):
         p_surface = p_surface.magnitude
     if hasattr(pot_tmp, 'magnitude'):
         pot_tmp = pot_tmp.magnitude
+    if hasattr(u, 'magnitude'):
+        u = u.magnitude
+    if hasattr(v, 'magnitude'):
+        v = v.magnitude
         
-    r = r * 1000  # in g/kg
     
     # surface measurements
-    sp = float(p_surface.values)  # surface pressure
+    sp = float(p_surface)  # surface pressure
     t_2m = float(pot_tmp[0])  # surface potential Temperature
     r_2m = float(r[0])  # surface vapor mixing ratio
     n_levels = z.shape[0]
+    
 
     line1 = '{:9.2f} {:9.2f} {:10.2f}'.format(sp, t_2m, r_2m)
     wrfformat = '{:9.2f} {:9.2f} {:10.2f} {:10.2f} {:10.2f}'
@@ -131,6 +123,7 @@ def write_WRF_format(z, p_surface, pot_tmp, r, u, v, f_out='./test.txt'):
     with open(f_out, 'w') as f:
         f.write(line1+' \n')
         for i in range(n_levels):
+
             d = wrfformat.format(float(z[i]), float(pot_tmp[i]), float(r[i]), float(u[i]), float(v[i]))
             f.write(d+ '\n')
     print(f_out, 'saved.')
